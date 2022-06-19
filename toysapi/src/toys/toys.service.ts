@@ -1,16 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { Toy } from './Entities/Toy';
 import { createClient } from 'redis';
-
+import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class ToysService {
+    readonly rclient: any;
 
-    readonly rclient = createClient();
+
     Toys: Toy[];
     /**
      *
      */
-    constructor() {
+    constructor(private _configService: ConfigService) {
+        console.log(_configService.get("redis_password"), "redis_password")
+        this.rclient = createClient({ password: _configService.get("redis_password") });
         this.initMockToys();
     }
 
@@ -20,9 +23,12 @@ export class ToysService {
 
     async initMockToys() {
         console.log(new Date());
-        await this.rclient.connect();
+        await this.rclient.connect().catch(x => {
+            console.log(x)
+        });
         let cachedToys = await this.rclient.get("toys");
-        console.log("cachedToys", cachedToys)
+        console.log("cachedToys", cachedToys);
+
         if (cachedToys == null || cachedToys.length == 0) {
             this.Toys = [];
             for (let index = 0; index < 10; index++) {
@@ -36,14 +42,12 @@ export class ToysService {
                 console.log(price)
                 toy.Price = price
                 this.Toys.push(toy);
-
             }
             this.rclient.set("toys", JSON.stringify(this.Toys));
         }
         else {
             this.Toys = JSON.parse(cachedToys);
         }
-
     }
 
     async UpdateToy(toy: Toy) {
